@@ -3,10 +3,19 @@
 #include <time.h>
 #include <math.h>
 #include <immintrin.h> // For SIMD intrinsics
+// #include <xmmintrin.h> 		// for intrinsic functions
 
-
+// Basic Tasks
 void naive_convolution(double *input_image, double *output_image, double *kernel, int dim, int output_dim, int kernel_size);
+void blocked_convolution(double *input_image, double *output_image, double *kernel, int dim, int output_dim, int kernel_size);
 void simd_convolution(double *input_image, double *output_image, double *kernel, int dim, int output_dim, int kernel_size);
+void prefetch_convolution(double *input_image, double *output_image, double *kernel, int dim, int output_dim, int kernel_size);
+
+// Bonus Tasks
+void blocked_simd_convolution(double *input_image, double *output_image, double *kernel, int dim, int output_dim, int kernel_size);
+void simd_prefetch_convolution(double *input_image, double *output_image, double *kernel, int dim, int output_dim, int kernel_size);
+void blocked_prefetch_convolution(double *input_image, double *output_image, double *kernel, int dim, int output_dim, int kernel_size);
+void simd_blocked_prefetch_convolution(double *input_image, double *output_image, double *kernel, int dim, int output_dim, int kernel_size);
 
 /**
  * @brief 		Generates random numbers between values fMin and fMax.
@@ -130,21 +139,97 @@ int main(int argc, char **argv)
     printf("Naive Convolution Time: %f seconds\n", naive_time);
 
 
-    // Measure execution time and perform SIMD convolution
-    #ifdef OPTIMIZE_SIMD
+// Measure execution time and perform blocked convolution
+#ifdef OPTIMIZE_BLOCKING
+
+    initialize_result_matrix(optimized_op, output_dim, output_dim);
+
+    double blocked_time = measure_execution_time(blocked_convolution, input_image, optimized_op, kernel, dim, output_dim, kernel_size);
+    double blocked_speedup = naive_time / blocked_time;
+    printf("Blocked Convolution Time: %f seconds, Speedup: %fx\n", blocked_time, blocked_speedup);
+
+    verify_correctness(output_image, optimized_op, output_dim);
+
+#endif
+
+// Measure execution time and perform SIMD convolution
+#ifdef OPTIMIZE_SIMD
 
     initialize_result_matrix(optimized_op, output_dim, output_dim);
 
     double simd_time = measure_execution_time(simd_convolution, input_image, optimized_op, kernel, dim, output_dim, kernel_size);
     double simd_speedup = naive_time / simd_time;
 
-
     printf("SIMD Convolution Time: %f seconds, Speedup: %fx\n", simd_time, simd_speedup);
     verify_correctness(output_image, optimized_op, output_dim);
 
-    #endif
+#endif
+
+// Measure execution time and perform prefetch convolution
+#ifdef OPTIMIZE_PREFETCH
+
+    initialize_result_matrix(optimized_op, output_dim, output_dim);
+
+    double prefetch_time = measure_execution_time(prefetch_convolution, input_image, optimized_op, kernel, dim, output_dim, kernel_size);
+    double prefetch_speedup = naive_time / prefetch_time;
+    printf("Prefetch Convolution Time: %f seconds, Speedup: %fx\n", prefetch_time, prefetch_speedup);
+
+    verify_correctness(output_image, optimized_op, output_dim);
+
+#endif
+
+// Bonus Tasks
+#ifdef OPTIMIZE_BLOCKING_SIMD
+    initialize_result_matrix(optimized_op, output_dim, output_dim);
+
+    // Measure execution time and perform blocked SIMD convolution
+    double blocked_simd_time = measure_execution_time(blocked_simd_convolution, input_image, optimized_op, kernel, dim, output_dim, kernel_size);
+    double blocked_simd_speedup = naive_time / blocked_simd_time;
+    printf("Blocked SIMD Convolution Time: %f seconds, Speedup: %fx\n", blocked_simd_time, blocked_simd_speedup);
+
+    verify_correctness(output_image, optimized_op, output_dim);
+
+#endif
+
+// Measure execution time and perform SIMD prefetch convolution
+#ifdef OPTIMIZE_SIMD_PREFETCH
+    initialize_result_matrix(optimized_op, output_dim, output_dim);
 
 
+    double simd_prefetch_time = measure_execution_time(simd_prefetch_convolution, input_image, optimized_op, kernel, dim, output_dim, kernel_size);
+    double simd_prefetch_speedup = naive_time / simd_prefetch_time;
+    printf("SIMD Prefetch Convolution Time: %f seconds, Speedup: %fx\n", simd_prefetch_time, simd_prefetch_speedup);
+
+    verify_correctness(output_image, optimized_op, output_dim);
+
+
+#endif
+
+// Measure execution time and perform blocked prefetch convolution
+#ifdef OPTIMIZE_BLOCKING_PREFETCH
+    initialize_result_matrix(optimized_op, output_dim, output_dim);
+
+    double blocked_prefetch_time = measure_execution_time(blocked_prefetch_convolution, input_image, optimized_op, kernel, dim, output_dim, kernel_size);
+    double blocked_prefetch_speedup = naive_time / blocked_prefetch_time;
+    printf("Blocked Prefetch Convolution Time: %f seconds, Speedup: %fx\n", blocked_prefetch_time, blocked_prefetch_speedup);
+
+    verify_correctness(output_image, optimized_op, output_dim);
+
+
+#endif
+
+// Measure execution time and perform SIMD blocked prefetch convolution
+#ifdef OPTIMIZE_BLOCKING_SIMD_PREFETCH
+    initialize_result_matrix(optimized_op, output_dim, output_dim);
+
+    double simd_blocked_prefetch_time = measure_execution_time(simd_blocked_prefetch_convolution, input_image, optimized_op, kernel, dim, output_dim, kernel_size);
+    double simd_blocked_prefetch_speedup = naive_time / simd_blocked_prefetch_time;
+    printf("SIMD Blocked Prefetch Convolution Time: %f seconds, Speedup: %fx\n", simd_blocked_prefetch_time, simd_blocked_prefetch_speedup);
+
+    verify_correctness(output_image, optimized_op, output_dim);
+
+
+#endif
 
     // Free allocated memory
     free(input_image);
@@ -161,7 +246,6 @@ void naive_convolution(double *input_image, double *output_image, double *kernel
     {
         for (int j = 0; j < output_dim; j++)
         {
-            // printf("i: %d, j: %d\n", i, j);
             double sum = 0.0;
             for (int ki = 0; ki < kernel_size; ki++)
             {
@@ -177,10 +261,50 @@ void naive_convolution(double *input_image, double *output_image, double *kernel
     }
 }
 
+// Blocked convolution implementation
+void blocked_convolution(double *input_image, double *output_image, double *kernel, int dim, int output_dim, int kernel_size)
+{
+   // Students need to implement this
+
+}
+
 // SIMD convolution implementation
 void simd_convolution(double *input_image, double *output_image, double *kernel, int dim, int output_dim, int kernel_size)
 {
-    // students need to implement this function
+    // Students need to implement this
+
+}
+
+// Prefetch convolution implementation
+void prefetch_convolution(double *input_image, double *output_image, double *kernel, int dim, int output_dim, int kernel_size)
+{
+    // Students need to implement this
+}
+
+// Bonus Tasks
+// Blocked SIMD convolution implementation
+void blocked_simd_convolution(double *input_image, double *output_image, double *kernel, int dim, int output_dim, int kernel_size)
+{
+    // Students need to implement this
+
+}
+
+// SIMD prefetch convolution implementation
+void simd_prefetch_convolution(double *input_image, double *output_image, double *kernel, int dim, int output_dim, int kernel_size)
+{
+    // Students need to implement this
+}
+
+// Blocked prefetch convolution implementation
+void blocked_prefetch_convolution(double *input_image, double *output_image, double *kernel, int dim, int output_dim, int kernel_size)
+{
+    // Students need to implement this
+}
+
+// SIMD blocked prefetch convolution implementation
+void simd_blocked_prefetch_convolution(double *input_image, double *output_image, double *kernel, int dim, int output_dim, int kernel_size)
+{
+    // Students need to implement this
 }
 
 // Function to measure execution time of a convolution function

@@ -32,14 +32,20 @@ void naiveMatrixTranspose(double *matrix, double *transpose, int size) {
     }
 }
 
-// Cache-Aware Blocked Matrix Transpose
-void blockedMatrixTranspose(double *matrix, double *transpose, int size, int blockSize) {
+// Cache-Aware tiled Matrix Transpose
+void tiledMatrixTranspose(double *matrix, double *transpose, int size, int blockSize) {
     // Students need to implement this function
 }
 
 
 // Prefetch Matrix Transpose
 void prefetchMatrixTranspose(double *matrix, double *transpose, int size) {
+    // Students need to implement this function
+}
+
+
+// Tiled Prefetch Matrix Transpose
+void tiledPrefetchedMatrixTranspose(double *matrix, double *transpose, int size) {
     // Students need to implement this function
 }
 
@@ -59,13 +65,13 @@ double naive(double * matrix, double *transpose, int size) {
 
 
 
-double blocked(double * matrix, double *transpose, int size, int blockSize) {
-    // Run and time the blocked matrix transpose
+double tiled(double * matrix, double *transpose, int size, int blockSize) {
+    // Run and time the tiled matrix transpose
     clock_t start = clock();
-    blockedMatrixTranspose(matrix, transpose, size, blockSize);
+    tiledMatrixTranspose(matrix, transpose, size, blockSize);
     clock_t end = clock();
     double time_taken = ((double)(end - start)) / CLOCKS_PER_SEC;
-    printf("Time taken by blocked matrix transpose: %f seconds\n", time_taken);
+    printf("Time taken by tiled matrix transpose: %f seconds\n", time_taken);
 
     return time_taken;
 }
@@ -78,6 +84,18 @@ double prefetched(double * matrix, double *transpose, int size) {
     clock_t end = clock();
     double time_taken = ((double)(end - start)) / CLOCKS_PER_SEC;
     printf("Time taken by prefetch matrix transpose: %f seconds\n", time_taken);
+
+    return time_taken;
+}
+
+
+double tiled_prefetched(double * matrix, double *transpose, int size) {
+    // Run and time the prefetch matrix transpose
+    clock_t start = clock();
+    tiledPrefetchedMatrixTranspose(matrix, transpose, size);
+    clock_t end = clock();
+    double time_taken = ((double)(end - start)) / CLOCKS_PER_SEC;
+    printf("Time taken by tiled prefetch matrix transpose: %f seconds\n", time_taken);
 
     return time_taken;
 }
@@ -111,8 +129,7 @@ int main(int argc, char *argv[]) {
     // Allocate memory for the matrices
     double *matrix = (double *)malloc(size * size * sizeof(double));
     double *naive_transpose = (double *)malloc(size * size * sizeof(double));
-    double *blocking_transpose = (double *)malloc(size * size * sizeof(double));
-    double *prefetch_transpose = (double *)malloc(size * size * sizeof(double));
+    double *optimized_transpose = (double *)malloc(size * size * sizeof(double));
 
     // Check if memory allocation was successful
     if (matrix == NULL || naive_transpose == NULL) {
@@ -135,27 +152,46 @@ int main(int argc, char *argv[]) {
 
 #endif
 
-#ifdef OPTIMIZE_BLOCKING
-    initializeResultMatrix(blocking_transpose, size);    
+
+// TASK 1A
+#ifdef OPTIMIZE_TILING
+    initializeResultMatrix(optimized_transpose, size);    
     
     double naive_time = naive(matrix, naive_transpose, size);
-    double blocked_time = blocked(matrix, blocking_transpose, size, blockSize);
+    double tiled_time = tiled(matrix, optimized_transpose, size, blockSize);
 
-    verify_correctness(naive_transpose, blocking_transpose, size);
+    verify_correctness(naive_transpose, optimized_transpose, size);
 
-    printf("The speedup obtained by blocking is %f\n", naive_time/blocked_time);
+    printf("The speedup obtained by blocking is %f\n", naive_time/tiled_time);
 
 #endif
 
 
+// TASK 1B
 #ifdef OPTIMIZE_PREFETCH
-    initializeResultMatrix(prefetch_transpose, size);
+    initializeResultMatrix(optimized_transpose, size);
     
     
     double naive_time = naive(matrix, naive_transpose, size);
-    double prefetched_time = prefetchMatrixTranspose(matrix, prefetch_transpose, size);
+    double prefetched_time = prefetched(matrix, optimized_transpose, size);
     
-    verify_correctness(naive_transpose, prefetch_transpose, size);
+    verify_correctness(naive_transpose, optimized_transpose, size);
+
+    printf("The speedup obtained by software prefetching is %f\n", naive_time/prefetched_time);
+    
+
+#endif
+
+
+// TASK 1C
+#ifdef OPTIMIZE_TILING_PREFETCH
+    initializeResultMatrix(optimized_transpose, size);
+    
+    
+    double naive_time = naive(matrix, naive_transpose, size);
+    double prefetched_time = tiled_prefetched(matrix, optimized_transpose, size);
+    
+    verify_correctness(naive_transpose, optimized_transpose, size);
 
     printf("The speedup obtained by software prefetching is %f\n", naive_time/prefetched_time);
     
@@ -165,8 +201,7 @@ int main(int argc, char *argv[]) {
     // Free the allocated memory
     free(matrix);
     free(naive_transpose);
-    free(blocking_transpose);
-    free(prefetch_transpose);
+    free(optimized_transpose);
 
     return 0;
 }
